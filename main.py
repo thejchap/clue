@@ -3,10 +3,16 @@ from clue.card import Card, Character, Case, Room, Weapon
 
 
 def main():
-    game = Game()
-    game.hand(Character.SCARLETT, {Room.KITCHEN, Weapon.DAGGER})
-    game.sat.add_clause(
-        {-Card.to_atomic_sentence(Weapon.CANDLESTICK, Character.SCARLETT)}
+    game = Game(players=list(Character), me=Character.SCARLETT)
+    game.hand({Room.KITCHEN, Weapon.DAGGER})
+
+    game.suggest(
+        Character.SCARLETT,
+        Character.WHITE,
+        Weapon.PIPE,
+        Room.HALL,
+        Character.PLUM,
+        False,
     )
 
     print(game.notepad())
