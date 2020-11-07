@@ -3,7 +3,8 @@ from itertools import combinations, cycle
 from dataclasses import dataclass, field
 from pandas import DataFrame
 from pysat.solvers import Maplesat as Solver
-from clue.card import Card, Character, Room, Weapon, Case
+from .card import Card, Character, Room, Weapon, Case
+from .util import encode_literal
 
 
 @dataclass
@@ -26,7 +27,7 @@ class Game:
         """
 
         for card in Card.deck():
-            atom = Card.to_atomic_sentence(card, self.me)
+            atom = encode_literal(card, self.me)
             atom = atom if card in cards else -atom
             self.sat.add_clause([atom])
 
@@ -36,7 +37,7 @@ class Game:
         be disproven by the inverse of the assumption
         """
 
-        literal = Card.to_atomic_sentence(card, place)
+        literal = encode_literal(card, place)
         a = self.sat.solve(assumptions=[literal])
 
         if not a:
@@ -74,7 +75,7 @@ class Game:
                 i was the suggester so i got to see the card
                 """
 
-                sentence = Card.to_atomic_sentence(card_shown, refuter)
+                sentence = encode_literal(card_shown, refuter)
                 self.sat.add_clause([sentence])
             else:
                 """
@@ -83,7 +84,7 @@ class Game:
 
                 clause = []
                 for card in [suspect, weapon, room]:
-                    sentence = Card.to_atomic_sentence(card, refuter)
+                    sentence = encode_literal(card, refuter)
                     clause.append(sentence)
                 self.sat.add_clause(clause)
 
@@ -106,7 +107,7 @@ class Game:
 
                 if on:
                     for card in [suspect, weapon, room]:
-                        sentence = -Card.to_atomic_sentence(card, player)
+                        sentence = -encode_literal(card, player)
                         self.sat.add_clause([sentence])
         else:
             """
@@ -119,7 +120,7 @@ class Game:
                     continue
 
                 for card in [suspect, weapon, room]:
-                    sentence = -Card.to_atomic_sentence(card, player)
+                    sentence = -encode_literal(card, player)
                     self.sat.add_clause([sentence])
 
     def accuse(
@@ -148,6 +149,12 @@ class Game:
             matrix.append(row)
 
         return matrix
+
+    def questions(self):
+        for c in Character:
+            for r in Room:
+                for w in Weapon:
+                    yield c, r, w
 
     def notepad(self) -> DataFrame:
         """
@@ -188,7 +195,7 @@ class Game:
         for card in Card.deck():
             clause = []
             for place in self.places():
-                clause.append(Card.to_atomic_sentence(card, place))
+                clause.append(encode_literal(card, place))
             clauses.append(clause)
 
         """
@@ -198,8 +205,8 @@ class Game:
         for card in Card.deck():
             for a, b in combinations(self.places(), 2):
                 clause = [
-                    -Card.to_atomic_sentence(card, a),
-                    -Card.to_atomic_sentence(card, b),
+                    -encode_literal(card, a),
+                    -encode_literal(card, b),
                 ]
                 clauses.append(clause)
 
@@ -208,7 +215,7 @@ class Game:
         """
 
         for category in {Weapon, Room, Character}:
-            clause = [Card.to_atomic_sentence(i, file) for i in category]
+            clause = [encode_literal(i, file) for i in category]
             clauses.append(clause)
 
         """
@@ -218,8 +225,8 @@ class Game:
         for category in {Weapon, Room, Character}:
             for a, b in combinations(category, 2):
                 clause = [
-                    -Card.to_atomic_sentence(a, file),
-                    -Card.to_atomic_sentence(b, file),
+                    -encode_literal(a, file),
+                    -encode_literal(b, file),
                 ]
                 clauses.append(clause)
 

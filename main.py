@@ -1,3 +1,4 @@
+from pprint import pprint
 from clue.game import Game
 from clue.card import Card, Character, Case, Room, Weapon
 

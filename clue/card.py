@@ -35,23 +35,6 @@ class Card(Enum):
         for room in Room:
             yield room
 
-    @staticmethod
-    def to_atomic_sentence(card: Card, place: Card) -> int:
-        """
-        smallest unit of propositional logic
-        card is in a place. encode in 8 bit int
-        """
-
-        return card.value << 3 | place.value
-
-    @staticmethod
-    def from_atomic_sentence(atom: int) -> Tuple[Card, Card]:
-        """
-        take atom and return card values
-        """
-
-        return Card.find(atom >> 3), Card.find(atom & 7)
-
 
 class Case(Card):
     FILE = 0
