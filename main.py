@@ -16,6 +16,15 @@ def main():
         False,
     )
 
+    game.suggest(
+        Character.WHITE,
+        Character.SCARLETT,
+        Weapon.WRENCH,
+        Room.BALLROOM,
+        Character.PEACOCK,
+        False,
+    )
+
     print(game.notepad())
 
 
