@@ -1,4 +1,7 @@
+from __future__ import annotations
 from typing import List, Tuple, Optional, Set, Union
+from enum import Enum
+from uuid import uuid4 as uuid
 from itertools import combinations, cycle
 from dataclasses import dataclass, field
 from pandas import DataFrame
@@ -10,8 +13,7 @@ from .util import encode_literal
 @dataclass
 class Game:
     me: Character
-    players: List[Character] = field(default_factory=list)
-    sat: Solver = None
+    players: List[Character]
 
     def __post_init__(self):
         """
@@ -19,17 +21,26 @@ class Game:
         take for granted
         """
 
-        self.sat = Solver(bootstrap_with=self.initial_clauses())
+        self.player_set = set(self.players)
+
+        if self.me not in self.player_set:
+            raise ValueError(self.me)
+
+        self.init()
 
     def hand(self, cards: Set[Card]):
         """
         add knowledge of my hand
         """
 
+        clauses = []
+
         for card in Card.deck():
             atom = encode_literal(card, self.me)
             atom = atom if card in cards else -atom
-            self.sat.add_clause([atom])
+            clauses.append([atom])
+
+        print(clauses)
 
     def test(self, card: Card, place: Card) -> Optional[bool]:
         """
@@ -37,13 +48,14 @@ class Game:
         be disproven by the inverse of the assumption
         """
 
+        sat = Solver(bootstrap_with=[])
         literal = encode_literal(card, place)
-        a = self.sat.solve(assumptions=[literal])
+        a = sat.solve(assumptions=[literal])
 
         if not a:
             return a
 
-        b = self.sat.solve(assumptions=[-literal])
+        b = sat.solve(assumptions=[-literal])
 
         if not b:
             return a
@@ -65,6 +77,14 @@ class Game:
         that into account too
         """
 
+        if suggester not in self.player_set:
+            raise ValueError(suggester)
+
+        if refuter and refuter not in self.player_set:
+            raise ValueError(refuter)
+
+        clauses = []
+
         if refuter:
             """
             somebody showed one of the 3 cards
@@ -76,7 +96,7 @@ class Game:
                 """
 
                 sentence = encode_literal(card_shown, refuter)
-                self.sat.add_clause([sentence])
+                clauses.append([sentence])
             else:
                 """
                 refuter has one of the 3 cards
@@ -86,7 +106,7 @@ class Game:
                 for card in [suspect, weapon, room]:
                     sentence = encode_literal(card, refuter)
                     clause.append(sentence)
-                self.sat.add_clause(clause)
+                clauses.append(clause)
 
             """
             everybody between suggester and refuter has none of the cards
@@ -108,7 +128,7 @@ class Game:
                 if on:
                     for card in [suspect, weapon, room]:
                         sentence = -encode_literal(card, player)
-                        self.sat.add_clause([sentence])
+                        clauses.append([sentence])
         else:
             """
             we learned that nobody has any of these cards.
@@ -121,7 +141,9 @@ class Game:
 
                 for card in [suspect, weapon, room]:
                     sentence = -encode_literal(card, player)
-                    self.sat.add_clause([sentence])
+                    clauses.append([sentence])
+
+        print(clauses)
 
     def accuse(
         self,
@@ -131,8 +153,16 @@ class Game:
         room: Room,
         is_correct: bool,
     ):
+        """
+        TODO
+        """
+
+        if accuser not in self.player_set:
+            raise ValueError(accuser)
+
         if is_correct:
-            return
+            raise Exception("WINNER")
+        raise Exception("LOSER")
 
     def matrix(self) -> List[List[Optional[bool]]]:
         """
@@ -149,12 +179,6 @@ class Game:
             matrix.append(row)
 
         return matrix
-
-    def questions(self):
-        for c in Character:
-            for r in Room:
-                for w in Weapon:
-                    yield c, r, w
 
     def notepad(self) -> DataFrame:
         """
@@ -179,7 +203,7 @@ class Game:
 
         return [Case.FILE] + self.players
 
-    def initial_clauses(self) -> List[List[int]]:
+    def init(self):
         """
         establish base logic for the game. things that all players know
         before gameplay even starts
@@ -230,4 +254,4 @@ class Game:
                 ]
                 clauses.append(clause)
 
-        return clauses
+        print(clauses)

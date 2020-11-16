@@ -1,2 +1,6 @@
 pandas
+matplotlib
+networkx
 python-sat
+fastapi
+uvicorn
