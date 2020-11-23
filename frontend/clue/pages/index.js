@@ -29,14 +29,8 @@ export default function Home() {
                 </Col>
                 <Col>
                   <Form.Group>
-                    <Form.Label>cards</Form.Label>
-                    <Form.Control as="select" multiple>
-                      <option>1</option>
-                      <option>2</option>
-                      <option>3</option>
-                      <option>4</option>
-                      <option>5</option>
-                    </Form.Control>
+                    <Form.Label>players</Form.Label>
+                    <Form.Control as="text"></Form.Control>
                   </Form.Group>
                 </Col>
               </Form.Row>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import List, Any, Optional, Set
+from inspect import getfullargspec
 import json
 from functools import wraps
 from enum import Enum
@@ -9,7 +10,7 @@ from uuid import uuid4 as uuid
 from fastapi import FastAPI, status, HTTPException, Request
 from pydantic import BaseModel
 from redis import Redis
-from clue import game, card, util
+from clue import game, card
 
 
 def event(func):
@@ -23,15 +24,16 @@ def event(func):
         attrs = {
             "id": str(uuid()),
             "name": func.__name__,
+            "args": req.dict(),
             "cnf": cnf,
             "game_cnf": game_cnf,
             "seq": seq,
         }
-        event = EventRes(**attrs)
+        event = EventRecord(**attrs)
         game.events.append(event)
         game.cnf = game_cnf
         self.db.set(f"game:{id}", game.json())
-        return GameRes(**game.dict())
+        return GameRecord(**game.dict())
 
     return wrapper
 
@@ -40,44 +42,43 @@ class GameService:
     def __init__(self):
         self.db = Redis()
 
-    def create(self, req: GameReq) -> GameRes:
+    def create(self, req: GameReq) -> GameRecord:
         game_id = str(uuid())
         defaults = {
             "id": game_id,
             "cnf": [],
             "next_seq": 0,
             "events": [],
-            "matrix": util.matrix([card.Character(c) for c in req.players]),
         }
         state = {**defaults, **req.dict()}
         self.db.set(f"game:{game_id}", json.dumps(state))
         self.db.sadd("games", f"game:{game_id}")
-        self.init(game_id, InitReq(players=req.players))
+        self.init(game_id, InitReq(me=state["me"], players=req.players))
         refreshed = json.loads(self.db.get(f"game:{game_id}"))
-        return GameRes(**refreshed)
+        return GameRecord(**refreshed)
 
-    def index(self) -> List[GameRes]:
+    def index(self) -> List[GameRecord]:
         ids = self.db.smembers("games")
         games = [json.loads(g) for g in self.db.mget(ids)]
-        return [GameRes(**g) for g in games]
+        return [GameRecord(**g) for g in games]
 
-    def show(self, id: str) -> GameRes:
+    def show(self, id: str) -> GameRecord:
         attrs = self.db.get(f"game:{id}")
 
         if not attrs:
             raise HTTPException(status_code=404)
 
-        return GameRes(**json.loads(attrs))
+        return GameRecord(**json.loads(attrs))
 
     @event
-    def hand(self, state: GameRes, req: HandReq) -> List[List[int]]:
+    def hand(self, state: GameRecord, req: HandReq) -> List[List[int]]:
         cards = {card.Card.find(c) for c in req.cards}
         me = card.Character(state.me)
 
         return game.hand(me, cards)
 
     @event
-    def accuse(self, state: GameRes, req: AccusationReq) -> List[List[int]]:
+    def accuse(self, state: GameRecord, req: AccusationReq) -> List[List[int]]:
         players = [card.Character(p) for p in state.players]
         accuser = card.Character(req.accuser)
         suspect = card.Character(req.suspect)
@@ -87,7 +88,7 @@ class GameService:
         return game.accuse(players, accuser, suspect, weapon, room, req.is_correct)
 
     @event
-    def suggest(self, state: GameRes, req: SuggestionReq) -> List[List[int]]:
+    def suggest(self, state: GameRecord, req: SuggestionReq) -> List[List[int]]:
         players = [card.Character(p) for p in state.players]
         suggester = card.Character(req.suggester)
         suspect = card.Character(req.suspect)
@@ -101,16 +102,24 @@ class GameService:
         )
 
     @event
-    def init(self, state: GameRes, req: InitReq) -> List[List[int]]:
+    def init(self, state: GameRecord, req: InitReq) -> List[List[int]]:
         return game.init([card.Character(p) for p in req.players])
+
+
+class EventRecord(BaseModel):
+    id: str
+    seq: int
+    name: str
+    args: Dict
+    cnf: List[List[int]]
+    game_cnf: List[List[int]]
 
 
 class EventRes(BaseModel):
     id: str
     seq: int
     name: str
-    cnf: List[List[int]]
-    game_cnf: List[List[int]]
+    args: Dict
 
 
 class GameReq(BaseModel):
@@ -123,11 +132,11 @@ class EventReq(BaseModel):
 
 
 class InitReq(EventReq):
+    me: int
     players: List[int]
 
 
 class HandReq(EventReq):
-    me: int
     cards: Set[int]
 
 
@@ -148,14 +157,20 @@ class AccusationReq(EventReq):
     is_correct: bool
 
 
-class GameRes(BaseModel):
+class GameRecord(BaseModel):
     id: str
     me: int
     players: List[int]
     next_seq: int
     cnf: List[List[int]]
+    events: List[EventRecord]
+
+
+class GameRes(BaseModel):
+    id: str
+    me: int
+    players: List[int]
     events: List[EventRes]
-    matrix: List[List[Optional[bool]]]
 
 
 service = GameService()
