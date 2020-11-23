@@ -1,4 +1,4 @@
-API=clue.api:api
+API=clue.api:API
 
 install:
 	@pip install -r requirements.txt
