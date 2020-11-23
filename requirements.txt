@@ -7,3 +7,4 @@ networkx
 python-sat
 fastapi
 uvicorn
+redis
