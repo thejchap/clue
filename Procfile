@@ -1,1 +1,1 @@
-web: uvicorn clue.api:api --host=0.0.0.0 --port=$PORT
+web: uvicorn clue.api:API --host=0.0.0.0 --port=$PORT

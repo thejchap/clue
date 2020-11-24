@@ -1,37 +1,42 @@
-from typing import List, Tuple, Optional, Set, Union
+from typing import List, Tuple, Optional, Set, Union, Dict
 from dataclasses import dataclass, field
+from pysat.solvers import Maplesat as Solver
+from clue import card, util
 
 
-Disjunctive = Set[int]
-Cnf = List[Disjunctive]
+def matrix(players: List[card.Character], cnf: List[List[int]]) -> Dict:
+    """
+    if its solvable with this assumption, ensure it can't
+    be disproven by the inverse of the assumption
+    """
 
+    matrix = {}
+    sat = Solver(bootstrap_with=cnf)
 
-@dataclass
-class Solver:
-    knowledge: Cnf = field(default_factory=list)
-
-    def add_clause(self, disjunctive: Disjunctive):
-        """
-        add disjunctive to our knowledge base (conjunctive)
-        """
-
-        self.knowledge.append(disjunctive)
-
-    def test(self, literal: int) -> Optional[bool]:
-        a, _ = dpll(self.knowledge + [{literal}])
+    def test(crd: card.Card, place: card.Card) -> Optional[bool]:
+        literal = util.encode_literal(crd, place)
+        a = sat.solve(assumptions=[literal])
 
         if not a:
             return a
 
-        b, _ = dpll(self.knowledge + [{-literal}])
+        b = sat.solve(assumptions=[-literal])
 
         if not b:
             return a
 
         return None
 
+    for c in card.Card.deck():
+        row = {}
+        for place in [card.Case.FILE, *players]:
+            row[place.value] = test(c, place)
+        matrix[c.value] = row
 
-def dpll(cnf: Cnf, assignments: Set[int] = set()) -> Tuple[bool, Set[int]]:
+    return matrix
+
+
+def dpll(cnf: List[Set[int]], assignments: Set[int] = set()) -> Tuple[bool, Set[int]]:
     """
     simple implementation of dpll algorithm. gonna use the other implementation that was
     written by a bunch of PHDs and won some awards for now

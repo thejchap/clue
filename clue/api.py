@@ -1,13 +1,22 @@
 from fastapi import FastAPI, status, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from clue import service
 
+ORIGINS = ["http://localhost:3000"]
 SERVICE = service.GameService()
 API = FastAPI()
+API.add_middleware(
+    CORSMiddleware,
+    allow_origins=ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @API.post("/games", response_model=service.GameRes, status_code=status.HTTP_201_CREATED)
-def games_create(req: service.GameReq):
-    return SERVICE.create(req)
+def games_create():
+    return SERVICE.create()
 
 
 @API.get("/games/{id}", response_model=service.GameRes)

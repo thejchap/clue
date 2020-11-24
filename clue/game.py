@@ -5,21 +5,6 @@ from .card import Card, Character, Room, Weapon, Case
 from .util import encode_literal
 
 
-def hand(me: Character, cards: Set[Card]) -> List[List[int]]:
-    """
-    add knowledge of my hand
-    """
-
-    clauses = []
-
-    for card in Card.deck():
-        atom = encode_literal(card, me)
-        atom = atom if card in cards else -atom
-        clauses.append([atom])
-
-    return clauses
-
-
 def suggest(
     players: List[Character],
     suggester: Character,
@@ -37,11 +22,14 @@ def suggest(
 
     player_set = set(players)
 
-    if suggester not in set(player_set):
+    if suggester not in player_set:
         raise ValueError(suggester)
 
-    if refuter and refuter not in set(player_set):
+    if refuter and refuter not in player_set:
         raise ValueError(refuter)
+
+    if card_shown and card_shown not in {suspect, weapon, room}:
+        raise ValueError(card_shown)
 
     clauses = []
 
@@ -126,15 +114,19 @@ def accuse(
     raise Exception("LOSER")
 
 
-def init(players: List[Character]):
+def hand(me: Character, cards: Set[Card], players: List[Character]):
     """
     establish base logic for the game. things that all players know
-    before gameplay even starts
+    before gameplay even starts. also add my hand
     """
 
     file = Case.FILE
     places = [file, *players]
     clauses = []
+    player_set = set(players)
+
+    if me not in player_set:
+        raise ValueError(me)
 
     """
     each card in at least one place
@@ -177,5 +169,10 @@ def init(players: List[Character]):
                 -encode_literal(b, file),
             ]
             clauses.append(clause)
+
+    for card in Card.deck():
+        atom = encode_literal(card, me)
+        atom = atom if card in cards else -atom
+        clauses.append([atom])
 
     return clauses
