@@ -1,12 +1,15 @@
 from typing import List, Tuple, Optional, Set, Union, Dict
 from dataclasses import dataclass, field
 from pysat.solvers import Maplesat as Solver
+from pandas import DataFrame
 from clue import card, util
 
 
 def matrix(players: List[card.Character], cnf: List[List[int]]) -> Dict:
     """
-    if its solvable with this assumption, ensure it can't
+    iterate over game knowledge, output matrix of
+    conclusions. for each bit of knowledge,
+    if its solvable with an assumption, ensure it can't
     be disproven by the inverse of the assumption
     """
 
@@ -34,6 +37,20 @@ def matrix(players: List[card.Character], cnf: List[List[int]]) -> Dict:
         matrix[c.value] = row
 
     return matrix
+
+
+def notepad(players: List[card.Character], cnf: List[List[int]]) -> DataFrame:
+    """
+    pretty print our understanding of game state
+    """
+
+    df = DataFrame.from_dict(matrix(players, cnf), orient="index")
+    df.columns = df.columns.map(lambda c: card.Card.find(c).name.lower())
+
+    def fmt(x):
+        return {None: "-", True: 1, False: 0}[x]
+
+    return df.applymap(fmt)
 
 
 def dpll(cnf: List[Set[int]], assignments: Set[int] = set()) -> Tuple[bool, Set[int]]:

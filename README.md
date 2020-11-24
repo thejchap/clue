@@ -2,12 +2,23 @@
 
 ## overview
 
-clue solver
+clue sat solver with a simple API
 
 ## usage
 
+### api
+
 ```zsh
-➜  clue git:(main) python main.py
+make server
+open http://localhost:8000/docs
+```
+
+### cli
+
+todo. currently just takes an existing game id and prints notepad
+
+```zsh
+➜  clue git:(main) python main.py notepad ea3aea32-00b6-43c7-9d67-da8adf23147a
               file  scarlett green mustard plum peacock white
 scarlett         -         0     -       -    -       -     -
 green            -         0     -       -    -       -     -
@@ -39,3 +50,6 @@ study            -         0     -       -    -       -     -
 - https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.627.3292&rep=rep1&type=pdf
 - https://en.wikipedia.org/wiki/Conjunctive_normal_form
 - https://davefernig.com/2018/05/07/solving-sat-in-python/
+- https://www.notion.so/Clue-solver-8686d0c92c664c8fa9f865b9b22426cd#abb1d829dbe342ceb1ae8902d4414593
+- http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.610.2876&rep=rep1&type=pdf
+- https://en.wikipedia.org/wiki/Influence_diagram
