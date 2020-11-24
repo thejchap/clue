@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from typing import List, Dict
 from uuid import uuid4 as uuid
 from pydantic import BaseModel
-from fastapi import HTTPException
 from redis import from_url
 from clue import game, card, util, sat
 
@@ -38,31 +37,31 @@ class EventReq(BaseModel):
 
 class HandReq(EventReq):
     cards: Set[int]
-    me: int
-    players: List[int]
+    me: card.Character
+    players: List[card.Character]
 
 
 class SuggestionReq(EventReq):
-    suggester: int
-    suspect: int
-    weapon: int
-    room: int
-    refuter: Optional[int]
+    suggester: card.Character
+    suspect: card.Character
+    weapon: card.Weapon
+    room: card.Room
+    refuter: Optional[card.Character]
     card_shown: Optional[int]
 
 
 class AccusationReq(EventReq):
-    accuser: int
-    suspect: int
-    weapon: int
-    room: int
+    accuser: card.Character
+    suspect: card.Character
+    weapon: card.Weapon
+    room: card.Room
     is_correct: bool
 
 
 class GameRecord(BaseModel):
     id: str
-    me: Optional[int]
-    players: List[int]
+    me: Optional[card.Character]
+    players: List[card.Character]
     next_seq: int
     cnf: List[List[int]]
     events: List[EventRecord]
@@ -71,8 +70,8 @@ class GameRecord(BaseModel):
 
 class GameRes(BaseModel):
     id: str
-    me: Optional[int]
-    players: List[int]
+    me: Optional[card.Character]
+    players: List[card.Character]
     events: List[EventRes]
     matrix: Dict
 
@@ -83,21 +82,20 @@ EventResult = Tuple[GameRecord, Cnf]
 
 def _event(func):
     @wraps(func)
-    def wrapper(self, id: str, req: EventReq):
+    def wrapper(self, id: str, req: EventReq) -> GameRecord:
         game = self.show(id)
+        game, cnf = func(self, game, req)
         seq = game.next_seq
         game.next_seq += 1
-        game, cnf = func(self, game, req)
-        game_cnf = game.cnf + cnf
-        game.cnf = game_cnf
+        game.cnf += cnf
         players = [card.Character(p) for p in game.players]
-        matrix = sat.matrix(players, game_cnf)
+        matrix = sat.matrix(players, game.cnf)
         attrs = {
             "id": str(uuid()),
             "name": func.__name__,
             "args": req.dict(),
             "cnf": cnf,
-            "game_cnf": game_cnf,
+            "game_cnf": game.cnf,
             "seq": seq,
             "matrix": matrix,
         }
@@ -135,47 +133,43 @@ class GameService:
         games = [json.loads(g) for g in self.db.mget(ids)]
         return [GameRecord(**g) for g in games]
 
-    def show(self, id: str) -> GameRecord:
+    def show(self, id: str) -> Optional[GameRecord]:
         attrs = self.db.get(f"game:{id}")
 
         if not attrs:
-            raise HTTPException(status_code=404)
+            raise ValueError(id)
 
         return GameRecord(**json.loads(attrs))
 
     @_event
     def hand(self, state: GameRecord, req: HandReq) -> EventResult:
-        players = [card.Character(p) for p in req.players]
         cards = {card.Card.find(c) for c in req.cards}
-        me = card.Character(req.me)
-
         state.me = req.me
         state.players = req.players
 
-        return state, game.hand(me, cards, players)
+        return state, game.hand(req.me, cards, req.players)
 
     @_event
     def accuse(self, state: GameRecord, req: AccusationReq) -> EventResult:
-        players = [card.Character(p) for p in state.players]
-        accuser = card.Character(req.accuser)
-        suspect = card.Character(req.suspect)
-        weapon = card.Weapon(req.weapon)
-        room = card.Room(req.room)
-
         return state, game.accuse(
-            players, accuser, suspect, weapon, room, req.is_correct
+            state.players,
+            req.accuser,
+            req.suspect,
+            req.weapon,
+            req.room,
+            req.is_correct,
         )
 
     @_event
     def suggest(self, state: GameRecord, req: SuggestionReq) -> EventResult:
-        players = [card.Character(p) for p in state.players]
-        suggester = card.Character(req.suggester)
-        suspect = card.Character(req.suspect)
-        weapon = card.Weapon(req.weapon)
-        room = card.Room(req.room)
-        refuter = card.Character(req.refuter) if req.refuter else None
         card_shown = card.Card.find(req.card_shown) if req.card_shown else None
 
         return state, game.suggest(
-            players, suggester, suspect, weapon, room, refuter, card_shown
+            state.players,
+            req.suggester,
+            req.suspect,
+            req.weapon,
+            req.room,
+            req.refuter,
+            card_shown,
         )
